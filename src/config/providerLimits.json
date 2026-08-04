@@ -1,0 +1,54 @@
+{
+  "providers": [
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "rpm": 10,
+      "rpd": 250,
+      "supportsVision": true,
+      "supportsText": true,
+      "badge": "Recommended",
+      "description": "Google Gemini — vision + text, balanced speed"
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
+      "rpm": 15,
+      "rpd": 1000,
+      "supportsVision": true,
+      "supportsText": true,
+      "badge": "Fastest",
+      "description": "Google Gemini — high volume burst generation"
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "rpm": 5,
+      "rpd": 100,
+      "supportsVision": true,
+      "supportsText": true,
+      "badge": "High Accuracy",
+      "description": "Google Gemini — deep reasoning for complex specs"
+    },
+    {
+      "id": "grok-2",
+      "name": "Groq (Qwen 3.6 + Llama 3.3)",
+      "rpm": 30,
+      "rpd": 1000,
+      "supportsVision": true,
+      "supportsText": true,
+      "badge": "Fastest",
+      "description": "Qwen 3.6 for vision, Llama 3.3 for text — Groq LPUs"
+    },
+    {
+      "id": "qase-aiden",
+      "name": "Qase Aiden",
+      "rpm": 10,
+      "rpd": 200,
+      "supportsVision": true,
+      "supportsText": true,
+      "badge": "Qase AI",
+      "description": "Qase AI-powered test generation"
+    }
+  ]
+}
