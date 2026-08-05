@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatGenerator } from "@/components/ChatGenerator";
 import { StoredTestCases } from "@/components/StoredTestCases";
+import TaskBoard from "@/components/TaskBoard";
 import { AuthModal } from "@/components/AuthModal";
 import { UsageMetersModal } from "@/components/UsageMetersModal";
 import { ExportModal } from "@/components/ExportModal";
@@ -14,8 +15,22 @@ import { LoginScreen } from "@/components/LoginScreen";
 import { LandingPage } from "@/components/LandingPage";
 import { AceternityLoader } from "@/components/AceternityLoader";
 import { useAuth } from "@/context/AuthContext";
-import { getProjects, getProjectTestCases, getProjectChats } from "@/lib/store";
-import { Project, TestCase, ChatMessage } from "@/types";
+import { 
+  getProjects, 
+  getProjectTestCases, 
+  getProjectChats,
+  getModules,
+  getSubModules,
+  getSubModuleTestCases,
+  getSubModuleChats,
+  getModuleTestCases,
+  getModuleChats,
+  deleteProject,
+  deleteModule,
+  deleteSubModule,
+  updateTestCase
+} from "@/lib/store";
+import { Project, TestCase, ChatMessage, Module, SubModule } from "@/types";
 
 export default function Home() {
   const { user, isDemoUser, loading } = useAuth();
@@ -23,9 +38,15 @@ export default function Home() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [activeTab, setActiveTab] = useState<"generator" | "repository">("generator");
+  const [activeTab, setActiveTab] = useState<"tasks" | "generator" | "repository">("generator");
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [chats, setChats] = useState<ChatMessage[]>([]);
+
+  // Module/SubModule state
+  const [modules, setModules] = useState<Module[]>([]);
+  const [activeModule, setActiveModule] = useState<Module | null>(null);
+  const [subModules, setSubModules] = useState<SubModule[]>([]);
+  const [activeSubModule, setActiveSubModule] = useState<SubModule | null>(null);
 
   // Modals state
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -36,6 +57,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -50,11 +72,16 @@ export default function Home() {
             setActiveProject(first);
             setTestCases(await getProjectTestCases(first.id));
             setChats(await getProjectChats(first.id));
+            setModules(await getModules(first.id));
           } else {
             // Clear active states if no projects exist for this user
             setActiveProject(null);
             setTestCases([]);
             setChats([]);
+            setModules([]);
+            setSubModules([]);
+            setActiveModule(null);
+            setActiveSubModule(null);
           }
         } catch (err) {
           console.error("Failed to load initial data", err);
@@ -70,12 +97,58 @@ export default function Home() {
     setActiveProject(proj);
     setTestCases(await getProjectTestCases(proj.id));
     setChats(await getProjectChats(proj.id));
+    setModules(await getModules(proj.id));
+    setActiveModule(null);
+    setActiveSubModule(null);
+    setSubModules([]);
+  };
+
+  const handleSelectModule = async (mod: Module) => {
+    setIsSwitching(true);
+    // Clear data immediately to prevent glitch
+    setTestCases([]);
+    setChats([]);
+    setActiveSubModule(null);
+    setActiveModule(mod);
+    setSubModules(await getSubModules(mod.id));
+    // Load only module-level test cases and chats (not from submodules)
+    setTestCases(await getModuleTestCases(mod.id));
+    setChats(await getModuleChats(mod.id));
+    setIsSwitching(false);
+  };
+
+  const handleSelectSubModule = async (subMod: SubModule) => {
+    setIsSwitching(true);
+    // Clear data immediately to prevent glitch
+    setTestCases([]);
+    setChats([]);
+    setActiveSubModule(subMod);
+    // Load only submodule-level test cases and chats
+    setTestCases(await getSubModuleTestCases(subMod.id));
+    setChats(await getSubModuleChats(subMod.id));
+    setIsSwitching(false);
   };
 
   const refreshActiveData = async () => {
     if (activeProject) {
-      setTestCases(await getProjectTestCases(activeProject.id));
-      setChats(await getProjectChats(activeProject.id));
+      if (activeSubModule) {
+        // SubModule selected: load only submodule data
+        setTestCases(await getSubModuleTestCases(activeSubModule.id));
+        setChats(await getSubModuleChats(activeSubModule.id));
+      } else if (activeModule) {
+        // Only Module selected: load only module-level data (not from submodules)
+        setTestCases(await getModuleTestCases(activeModule.id));
+        setChats(await getModuleChats(activeModule.id));
+      } else {
+        // No module selected: load all project data
+        setTestCases(await getProjectTestCases(activeProject.id));
+        setChats(await getProjectChats(activeProject.id));
+      }
+      // Refresh modules list
+      setModules(await getModules(activeProject.id));
+      if (activeModule) {
+        setSubModules(await getSubModules(activeModule.id));
+      }
     }
   };
 
@@ -103,6 +176,49 @@ export default function Home() {
     setIsExportModalOpen(true);
   };
 
+  const handleDeleteProject = async (projectId: string) => {
+    if (confirm("Are you sure you want to delete this project? This will delete all modules, submodules, test cases, and chats. This action cannot be undone.")) {
+      await deleteProject(projectId);
+      const projs = await getProjects(user!.uid);
+      setProjects(projs);
+      if (activeProject?.id === projectId) {
+        if (projs.length > 0) {
+          await handleSelectProject(projs[0]);
+        } else {
+          setActiveProject(null);
+          setTestCases([]);
+          setChats([]);
+          setModules([]);
+          setSubModules([]);
+          setActiveModule(null);
+          setActiveSubModule(null);
+        }
+      }
+    }
+  };
+
+  const handleDeleteModule = async (moduleId: string) => {
+    if (confirm("Are you sure you want to delete this module? This will delete all submodules, test cases, and chats in this module. This action cannot be undone.")) {
+      await deleteModule(moduleId, activeProject!.id);
+      await refreshActiveData();
+      if (activeModule?.id === moduleId) {
+        setActiveModule(null);
+        setActiveSubModule(null);
+        setSubModules([]);
+      }
+    }
+  };
+
+  const handleDeleteSubModule = async (subModuleId: string) => {
+    if (confirm("Are you sure you want to delete this submodule? This will delete all test cases and chats in this submodule. This action cannot be undone.")) {
+      await deleteSubModule(subModuleId, activeProject!.id);
+      await refreshActiveData();
+      if (activeSubModule?.id === subModuleId) {
+        setActiveSubModule(null);
+      }
+    }
+  };
+
   if (loading || isDataLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
@@ -120,7 +236,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300">
+    <div className="h-screen flex flex-col font-sans transition-colors duration-300 overflow-hidden">
       {/* Top Navbar Header */}
       <Navbar
         activeProject={activeProject}
@@ -139,27 +255,51 @@ export default function Home() {
         <Sidebar
           projects={projects}
           activeProject={activeProject}
+          modules={modules}
+          activeModule={activeModule}
+          subModules={subModules}
+          activeSubModule={activeSubModule}
           onSelectProject={(proj) => {
             handleSelectProject(proj);
             setIsSidebarOpen(false);
           }}
+          onSelectModule={handleSelectModule}
+          onSelectSubModule={handleSelectSubModule}
+          onDeleteProject={handleDeleteProject}
+          onDeleteModule={handleDeleteModule}
+          onDeleteSubModule={handleDeleteSubModule}
           onOpenCreateProject={() => {
             handleOpenCreateProject();
             setIsSidebarOpen(false);
           }}
+          onRefreshData={refreshActiveData}
           storedCount={testCases.length}
+          userId={user.uid}
           isOpenMobile={isSidebarOpen}
           onCloseMobile={() => setIsSidebarOpen(false)}
         />
 
         {/* Workspace Container */}
         {activeProject ? (
-          activeTab === "generator" ? (
+          activeTab === "tasks" ? (
+            <TaskBoard
+              testCases={testCases}
+              activeModule={activeModule}
+              activeSubModule={activeSubModule}
+              onRefreshData={refreshActiveData}
+              updateTestCase={updateTestCase}
+              projectId={activeProject.id}
+              isLoading={isSwitching}
+            />
+          ) : activeTab === "generator" ? (
             <ChatGenerator
               project={activeProject}
               chats={chats}
               existingCases={testCases}
               onRefreshData={refreshActiveData}
+              activeModule={activeModule}
+              activeSubModule={activeSubModule}
+              isLoading={isSwitching}
             />
           ) : (
             <StoredTestCases
@@ -167,6 +307,9 @@ export default function Home() {
               testCases={testCases}
               onRefreshData={refreshActiveData}
               onOpenExportModal={handleOpenExportModal}
+              activeModule={activeModule}
+              activeSubModule={activeSubModule}
+              isLoading={isSwitching}
             />
           )
         ) : (

@@ -22,8 +22,9 @@ import {
   PlusCircle,
   Edit3,
   Loader2,
+  Box,
 } from "lucide-react";
-import { ChatMessage, TestCase, Project, ProviderInfo } from "@/types";
+import { ChatMessage, TestCase, Project, ProviderInfo, Module, SubModule } from "@/types";
 import providerLimits from "@/config/providerLimits.json";
 import { logProviderUsage, calculateProviderStats, ProviderQuotaStats } from "@/lib/usageTracker";
 import { saveChatMessage, saveTestCase, deleteTestCase, deleteChatMessage } from "@/lib/store";
@@ -35,6 +36,9 @@ interface ChatGeneratorProps {
   chats: ChatMessage[];
   existingCases: TestCase[];
   onRefreshData: () => void;
+  activeModule?: Module | null;
+  activeSubModule?: SubModule | null;
+  isLoading?: boolean;
 }
 
 // ─── SVG provider logos ─────────────────────────────────────────────────────
@@ -469,7 +473,7 @@ function ReviewStoreModal({ isOpen, onClose, onSave, initialCase }: ReviewStoreM
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export function ChatGenerator({ project, chats, existingCases, onRefreshData }: ChatGeneratorProps) {
+export function ChatGenerator({ project, chats, existingCases, onRefreshData, activeModule, activeSubModule, isLoading = false }: ChatGeneratorProps) {
   const { user, isDemoUser } = useAuth();
   const [selectedProvider, setSelectedProvider] = useState<string>("grok-2");
   const [isModelOpen, setIsModelOpen] = useState(false);
@@ -547,11 +551,19 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
     // Upload image if present
     if (imgUrl && user?.uid && imgUrl.startsWith("data:")) {
       try {
-        imgUrl = await uploadImageToCloudinary(imgUrl, `qalens/${user.uid}/test-inputs`);
+        imgUrl = await uploadImageToCloudinary(imgUrl, `qasuite/${user.uid}/test-inputs`);
       } catch { imgUrl = attachedImage; }
     }
 
-    const userMsg = await saveChatMessage({ projectId: project.id, sender: "user", content: userText || "Attached UI Screenshot", sourceUrl: imgUrl || null, sourceType: currentSource });
+    const userMsg = await saveChatMessage({ 
+      projectId: project.id, 
+      moduleId: activeModule?.id, 
+      subModuleId: activeSubModule?.id, 
+      sender: "user", 
+      content: userText || "Attached UI Screenshot", 
+      sourceUrl: imgUrl || null, 
+      sourceType: currentSource 
+    });
     onRefreshData();
 
     try {
@@ -566,7 +578,10 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
       const data = await res.json();
       if (data.generatedCases?.length) {
         await saveChatMessage({
-          projectId: project.id, sender: "ai",
+          projectId: project.id, 
+          moduleId: activeModule?.id, 
+          subModuleId: activeSubModule?.id,
+          sender: "ai",
           content: `Generated ${data.generatedCases.length} categorized, non-duplicate test cases based on structured context.`,
           provider: data.providerUsed || selectedProvider,
           structuredContext: data.structuredContext,
@@ -574,10 +589,24 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
           responseTo: userMsg.id,
         });
       } else {
-        await saveChatMessage({ projectId: project.id, sender: "ai", content: `AI Generation Warning: ${data.error || "Falling back to structured rule generator."}`, responseTo: userMsg.id });
+        await saveChatMessage({ 
+          projectId: project.id, 
+          moduleId: activeModule?.id, 
+          subModuleId: activeSubModule?.id,
+          sender: "ai", 
+          content: `AI Generation Warning: ${data.error || "Falling back to structured rule generator."}`, 
+          responseTo: userMsg.id 
+        });
       }
     } catch {
-      await saveChatMessage({ projectId: project.id, sender: "ai", content: "Error communicating with AI Provider pipeline. Please try again.", responseTo: userMsg.id });
+      await saveChatMessage({ 
+        projectId: project.id, 
+        moduleId: activeModule?.id, 
+        subModuleId: activeSubModule?.id,
+        sender: "ai", 
+        content: "Error communicating with AI Provider pipeline. Please try again.", 
+        responseTo: userMsg.id 
+      });
     } finally {
       setIsGenerating(false);
       setPipelineState("idle");
@@ -586,7 +615,13 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
   };
 
   const handleStoreCase = async (testCase: Omit<TestCase, "id" | "projectId" | "createdAt">, idxKey: string) => {
-    const saved = await saveTestCase({ ...testCase, projectId: project.id, status: "approved" });
+    const saved = await saveTestCase({ 
+      ...testCase, 
+      projectId: project.id, 
+      moduleId: activeModule?.id, 
+      subModuleId: activeSubModule?.id,
+      status: "approved" 
+    });
     setStoredCaseIds((prev) => new Set(prev).add(idxKey));
     setCaseKeyToFirestoreId((prev) => ({ ...prev, [idxKey]: saved.id }));
     onRefreshData();
@@ -597,7 +632,13 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
     for (let i = 0; i < cases.length; i++) {
       const key = `${msgId}_case_${i}`;
       if (!storedCaseIds.has(key) && !removedCaseKeys.has(key)) {
-        const saved = await saveTestCase({ ...cases[i], projectId: project.id, status: "approved" });
+        const saved = await saveTestCase({ 
+          ...cases[i], 
+          projectId: project.id, 
+          moduleId: activeModule?.id, 
+          subModuleId: activeSubModule?.id,
+          status: "approved" 
+        });
         setStoredCaseIds((prev) => new Set(prev).add(key));
         setCaseKeyToFirestoreId((prev) => ({ ...prev, [key]: saved.id }));
       }
@@ -648,16 +689,48 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
   };
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] bg-white dark:bg-[#080b10]">
+    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#080b10] relative">
 
-      {/* ─── Top Model Bar ─── */}
-      <div className="h-12 border-b border-slate-200 dark:border-gray-800/80 bg-white/80 dark:bg-[#0a0d14]/80 backdrop-blur-md px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Active Model Pill */}
-          <div>
-            <button
-              ref={modelBtnRef}
-              type="button"
+      {/* ─── Loading State (Full Overlay) ─── */}
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-[#080b10]">
+          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-4">
+            <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Loading...</h3>
+          <p className="text-xs text-slate-500 dark:text-gray-400">Fetching data for this module</p>
+        </div>
+      )}
+
+      {/* ─── No Module Selected State ─── */}
+      {!isLoading && !activeModule && (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-4">
+            <Box className="w-7 h-7 text-indigo-400" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            Select a Module to Continue
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-gray-400 max-w-md mb-4">
+            To create or store test cases, please select a module from the sidebar. 
+            If no modules exist yet, create one first.
+          </p>
+          <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-gray-500">
+            <Box className="w-4 h-4" />
+            <span>Project → Module → Test Cases</span>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Top Model Bar (show when module is selected) ─── */}
+      {activeModule && (
+        <div className="h-12 border-b border-slate-200 dark:border-gray-800/80 bg-white/80 dark:bg-[#0a0d14]/80 backdrop-blur-md px-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Active Model Pill */}
+            <div>
+              <button
+                ref={modelBtnRef}
+                type="button"
               onClick={() => setIsModelOpen((v) => !v)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                 isModelOpen
@@ -706,8 +779,10 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
           </span>
         </div>
       </div>
+      )}
 
       {/* ─── Chat Feed ─── */}
+      {activeModule && (
       <div className="flex-1 overflow-y-auto">
         {chats.length === 0 ? (
           /* ── AetherAI-style Hero Empty State ── */
@@ -1024,8 +1099,10 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
           </div>
         )}
       </div>
+      )}
 
-      {/* ─── Bottom Prompt Bar ─── */}
+      {/* ─── Bottom Prompt Bar (show when module is selected) ─── */}
+      {activeModule && (
       <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-gray-800/80 bg-white/80 dark:bg-[#0a0d14]/90 backdrop-blur-md">
         {attachedImage && (
           <div className="mb-2 inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-gray-800/80 border border-slate-300 dark:border-gray-700 rounded-xl text-xs text-indigo-400">
@@ -1088,6 +1165,7 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData }: 
           </button>
         </div>
       </div>
+      )}
 
       {editingCase && editingCaseKey && (
         <ReviewStoreModal

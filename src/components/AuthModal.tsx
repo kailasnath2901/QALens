@@ -115,11 +115,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-11 h-11 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center p-1.5 shadow-md">
-            <Image src="/images/qalens_logo.svg" alt="QAlens Logo" width={32} height={32} className="w-full h-full object-contain" />
+            <Image src="/images/qasuite_logo.svg" alt="QASuite Logo" width={32} height={32} className="w-full h-full object-contain" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-white">
-              {mode === "login" ? "Sign In to QAlens" : "Register QAlens User"}
+              {mode === "login" ? "Sign In to QASuite" : "Register QASuite User"}
             </h2>
             <p className="text-xs text-gray-400">
               Firebase Auth & AI Test Management

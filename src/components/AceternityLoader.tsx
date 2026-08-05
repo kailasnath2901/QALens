@@ -16,8 +16,8 @@ export function AceternityLoader() {
           />
           <div className="absolute inset-2 flex items-center justify-center">
             <Image
-              src="/images/qalens_logo.svg"
-              alt="QAlens"
+              src="/images/qasuite_logo.svg"
+              alt="QASuite"
               width={40}
               height={40}
               className="w-10 h-10 object-contain animate-pulse-soft"
@@ -28,7 +28,7 @@ export function AceternityLoader() {
 
         {/* Wordmark */}
         <p className="text-sm font-medium text-gray-400 tracking-wide animate-pulse-soft">
-          QAlens
+          QASuite
         </p>
       </div>
 

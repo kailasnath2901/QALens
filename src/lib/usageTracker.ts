@@ -1,7 +1,7 @@
 import { UsageLog } from "@/types";
 import providerLimits from "@/config/providerLimits.json";
 
-const STORAGE_KEY = "qalens_usage_logs";
+const STORAGE_KEY = "qasuite_usage_logs";
 
 export function getLocalUsageLogs(): UsageLog[] {
   if (typeof window === "undefined") return [];

@@ -4,7 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 
 export const metadata: Metadata = {
-  title: "QAlens — AI-Powered Test Case Management",
+  title: "QASuite — AI-Powered Test Case Management",
   description: "Transform screenshots and text requirements into structured, high-quality test suites with multi-provider AI pipeline, rate limit meters, and Qase export.",
 };
 

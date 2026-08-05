@@ -16,6 +16,25 @@ export interface Project {
   testCaseCount?: number;
 }
 
+export interface Module {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  testCaseCount: number;
+  createdAt: number;
+}
+
+export interface SubModule {
+  id: string;
+  moduleId: string;
+  projectId: string;
+  name: string;
+  description: string;
+  testCaseCount: number;
+  createdAt: number;
+}
+
 export interface TestCaseStep {
   stepNumber: number;
   action: string;
@@ -27,19 +46,21 @@ export type TestCaseCategory = "input_validation" | "empty_states" | "error_hand
 export interface TestCase {
   id: string;
   projectId: string;
-  moduleName?: string;
+  moduleId?: string | null;
+  subModuleId?: string | null;
+  moduleName?: string | null;
   title: string;
   category: TestCaseCategory;
-  preconditions?: string;
-  testData?: string;
+  preconditions?: string | null;
+  testData?: string | null;
   steps: string[];
   expectedResult: string;
-  executionResult?: "pass" | "fail" | "untested";
-  comments?: string;
+  executionResult?: "pass" | "fail" | "untested" | null;
+  comments?: string | null;
   sourceType: "image" | "text" | "manual";
   sourceUrl?: string | null;
   provider: string;
-  status: "draft" | "reviewed" | "approved";
+  status: "pending" | "in_progress" | "draft" | "reviewed" | "approved" | "done";
   createdAt: number;
   tags?: string[];
 }
@@ -56,6 +77,8 @@ export interface StructuredContext {
 export interface ChatMessage {
   id: string;
   projectId: string;
+  moduleId?: string;
+  subModuleId?: string;
   sender: "user" | "ai";
   content: string;
   sourceType?: "image" | "text";

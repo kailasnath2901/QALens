@@ -132,11 +132,11 @@ export function LoginScreen({ onBackToLanding }: LoginScreenProps) {
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
             <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 p-1.5 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Image src="/images/qalens_logo.svg" alt="QAlens Logo" width={40} height={40} className="w-full h-full object-contain" />
+              <Image src="/images/qasuite_logo.svg" alt="QASuite Logo" width={40} height={40} className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="font-extrabold text-2xl tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500">
-                QAlens
+                QASuite
               </span>
               <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20">
                 AI 2.0
@@ -202,7 +202,7 @@ export function LoginScreen({ onBackToLanding }: LoginScreenProps) {
 
           <div>
             <h2 className="text-xl font-bold mb-1">
-              {mode === "login" ? "Sign in to QAlens" : "Create QAlens Account"}
+              {mode === "login" ? "Sign in to QASuite" : "Create QASuite Account"}
             </h2>
             <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-slate-500"}`}>
               {mode === "login" ? "Welcome back! Please enter your credentials." : "Register a new user account with Firebase Auth."}

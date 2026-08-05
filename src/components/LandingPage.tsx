@@ -93,11 +93,11 @@ export function LandingPage({ onOpenLogin }: LandingPageProps) {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20">
             <div className="w-full h-full bg-gray-950 rounded-[14px] flex items-center justify-center p-1.5">
-              <Image src="/images/qalens_logo.svg" alt="QAlens Logo" width={32} height={32} className="w-full h-full object-contain" />
+              <Image src="/images/qasuite_logo.svg" alt="QASuite Logo" width={32} height={32} className="w-full h-full object-contain" />
             </div>
           </div>
           <span className="font-extrabold text-xl tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500">
-            QAlens AI
+            QASuite AI
           </span>
         </div>
 
@@ -155,7 +155,7 @@ export function LandingPage({ onOpenLogin }: LandingPageProps) {
         <div className="relative z-10 max-w-4xl mx-auto space-y-6">
           <p className="mx-auto max-w-lg py-2 text-center text-xl sm:text-2xl font-bold tracking-tight">
             <EncryptedText
-              text="Welcome to QAlens."
+              text="Welcome to QASuite."
               encryptedClassName="text-neutral-500"
               revealedClassName={theme === "dark" ? "text-indigo-400" : "text-indigo-600"}
               revealDelayMs={50}
@@ -349,8 +349,8 @@ export function LandingPage({ onOpenLogin }: LandingPageProps) {
       }`}>
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Image src="/images/qalens_logo.svg" alt="QAlens Logo" width={20} height={20} className="w-5 h-5" />
-            <span className="font-bold text-gray-300">QAlens AI</span>
+            <Image src="/images/qasuite_logo.svg" alt="QASuite Logo" width={20} height={20} className="w-5 h-5" />
+            <span className="font-bold text-gray-300">QASuite AI</span>
           </div>
           <p>© {new Date().getFullYear()} QAlens AI Inc. All rights reserved.</p>
         </div>

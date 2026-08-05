@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { Sparkles, Database, Gauge, LogIn, LogOut, ChevronRight, Sun, Moon, Menu } from "lucide-react";
+import { Sparkles, Database, Gauge, LogIn, LogOut, ChevronRight, Sun, Moon, Menu, Layers } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Project } from "@/types";
@@ -10,8 +10,8 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface NavbarProps {
   activeProject: Project | null;
-  activeTab: "generator" | "repository";
-  setActiveTab: (tab: "generator" | "repository") => void;
+  activeTab: "tasks" | "generator" | "repository";
+  setActiveTab: (tab: "tasks" | "generator" | "repository") => void;
   onOpenUsageModal: () => void;
   onOpenAuthModal: () => void;
   onOpenUserProfileModal?: () => void;
@@ -51,12 +51,12 @@ export function Navbar({
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
             <div className="w-full h-full bg-gray-950 rounded-[10px] flex items-center justify-center p-1">
-              <Image src="/images/qalens_logo.svg" alt="QAlens Logo" width={28} height={28} className="w-6 h-6 object-contain" />
+              <Image src="/images/qasuite_logo.svg" alt="QASuite Logo" width={28} height={28} className="w-6 h-6 object-contain" />
             </div>
           </div>
           <div className="hidden sm:block">
             <span className="font-bold text-lg tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500">
-              QAlens
+              QASuite
             </span>
             <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20">
               AI 2.0
@@ -79,6 +79,19 @@ export function Navbar({
         <div className={`flex items-center p-1 rounded-xl border ${
           theme === "dark" ? "bg-gray-900/90 border-gray-800/80" : "bg-slate-100 border-slate-200"
         }`}>
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === "tasks"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : theme === "dark" ? "text-gray-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tasks</span>
+            <span className="sm:hidden">Tasks</span>
+          </button>
+
           <button
             onClick={() => setActiveTab("generator")}
             className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${

@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     // Default folder structure if none provided
-    const uploadFolder = folder || "qalens/general";
+    const uploadFolder = folder || "qasuite/general";
 
     // Upload to cloudinary
     const result = await cloudinary.uploader.upload(image, {

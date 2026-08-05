@@ -29,12 +29,23 @@ body {
 }
 
 /* Custom Scrollbars */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: rgba(10, 13, 20, 0.6); }
-html.light ::-webkit-scrollbar-track { background: #F1F5F9; }
-::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.25); border-radius: 4px; }
-html.light ::-webkit-scrollbar-thumb { background: #CBD5E1; }
-::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.5); }
+::-webkit-scrollbar { width: 6px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(20, 24, 36, 0.8); border-radius: 4px; }
+html.light ::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 4px; }
+html.light ::-webkit-scrollbar-thumb { background: #94A3B8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* Kanban horizontal scroll */
+.kanban-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.4) rgba(20, 24, 36, 0.8);
+  scroll-behavior: smooth;
+}
+.kanban-scroll.shift-scroll {
+  overflow-x: auto;
+}
 
 /* Glassmorphism */
 .glass-panel {

@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const enableDemoUser = () => {
     const demoData = {
       uid: "demo_user_123",
-      email: "qa.lead@qalens.dev",
+      email: "qa.lead@qasuite.dev",
       displayName: "Lead QA Engineer",
       photoURL: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo"
     };

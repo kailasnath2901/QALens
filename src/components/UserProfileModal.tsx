@@ -44,7 +44,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
         // Upload to cloudinary with folder structure
         const imageUrl = await uploadImageToCloudinary(
           base64String,
-          `qalens/${userProfile.uid}/profile-image`
+          `qasuite/${userProfile.uid}/profile-image`
         );
         await updateUserProfile({ photoURL: imageUrl });
       };
