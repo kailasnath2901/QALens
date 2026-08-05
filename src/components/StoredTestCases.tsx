@@ -185,18 +185,18 @@ export function StoredTestCases({
 
     await saveTestCase({
       projectId: project.id,
-      moduleId: activeModule?.id,
-      subModuleId: activeSubModule?.id,
+      moduleId: activeModule?.id || null,
+      subModuleId: activeSubModule?.id || null,
       moduleName: activeModule?.name || null,
       title: quickTitle,
       category: quickCategory,
       preconditions: "User is active on system",
-      testData: quickTestData || undefined,
+      testData: quickTestData || null,
       steps: stepsArray,
       expectedResult: quickExpected,
       executionResult: "untested",
       sourceType: quickImage ? "image" : "manual",
-      sourceUrl: uploadedImageUrl,
+      sourceUrl: uploadedImageUrl || null,
       provider: "manual-authoring",
       status: "approved",
       tags: ["Manual-Store"]
