@@ -729,3 +729,67 @@ export async function updateUserRole(uid: string, role: "admin" | "user"): Promi
     throw error;
   }
 }
+
+export async function deleteUserAccount(uid: string): Promise<void> {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    await deleteDoc(userRef);
+  } catch (error) {
+    console.error("Error deleting user account:", error);
+    throw error;
+  }
+}
+
+export async function updateUserProjectLimit(uid: string, maxProjects: number): Promise<void> {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      const current = snap.data() as UserProfile;
+      await updateDoc(userRef, {
+        features: {
+          ...(current.features || { enableTony: false, enableTonyVoice: false, enableTonyChat: false, enableGemini: false, enableGroq: false }),
+          maxProjects
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error updating user project limit:", error);
+    throw error;
+  }
+}
+
+export async function getSystemReportStats() {
+  try {
+    const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
+    const projectsSnap = await getDocs(collection(db, PROJECTS_COLLECTION));
+    const testCasesSnap = await getDocs(collection(db, TESTCASES_COLLECTION));
+    const modulesSnap = await getDocs(collection(db, MODULES_COLLECTION));
+
+    let passedCases = 0;
+    let failedCases = 0;
+    let untestedCases = 0;
+
+    testCasesSnap.forEach(d => {
+      const tc = d.data();
+      if (tc.executionResult === "pass") passedCases++;
+      else if (tc.executionResult === "fail") failedCases++;
+      else untestedCases++;
+    });
+
+    return {
+      totalUsers: usersSnap.size,
+      totalProjects: projectsSnap.size,
+      totalModules: modulesSnap.size,
+      totalTestCases: testCasesSnap.size,
+      executionStats: {
+        pass: passedCases,
+        fail: failedCases,
+        untested: untestedCases
+      }
+    };
+  } catch (err) {
+    console.error("Error fetching system report stats:", err);
+    return null;
+  }
+}

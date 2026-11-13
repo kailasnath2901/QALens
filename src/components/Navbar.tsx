@@ -163,14 +163,14 @@ export function Navbar({
         </button>
 
         {/* Admin Dashboard Pill for Admins */}
-        {(userProfile?.role === "admin" || (process.env.NEXT_PUBLIC_ADMIN_EMAIL && user?.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase())) && (
+        {(userProfile?.role === "admin" || user?.email?.toLowerCase() === "admin@qalens.com") && (
           <Link
             href="/admin"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 hover:text-white border border-indigo-500/40 hover:border-indigo-400 transition-all shadow-md shadow-indigo-500/10"
             title="Open QALens Admin Console"
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Admin Console</span>
+            <ShieldCheck className="w-4 h-4 text-indigo-400 animate-pulse" />
+            <span>Admin Console</span>
           </Link>
         )}
 
