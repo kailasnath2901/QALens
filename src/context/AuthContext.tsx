@@ -110,60 +110,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     try {
-      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-      const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+      // 1. Secure Server-Side Admin Check
+      try {
+        const verifyRes = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: pass })
+        });
+        const verifyData = await verifyRes.json();
 
-      // Check if credentials match the configured Admin in env
-      if (
-        adminEmail && 
-        adminPassword && 
-        email.toLowerCase() === adminEmail.toLowerCase() && 
-        pass === adminPassword
-      ) {
-        try {
-          // Attempt standard sign in
-          await signInWithEmailAndPassword(auth, email, pass);
-        } catch (authErr: any) {
-          // If user doesn't exist in Firebase yet, auto-provision the admin account
-          if (authErr.code === "auth/user-not-found" || authErr.code === "auth/invalid-credential") {
-            try {
-              await createUserWithEmailAndPassword(auth, email, pass);
-            } catch {
-              // Fallback to local admin session if Firebase account creation fails
-              const adminUid = "admin_master_root";
-              const adminProfile: UserProfile = {
-                uid: adminUid,
-                email: adminEmail,
-                displayName: "System Administrator",
-                role: "admin",
-                status: "approved",
-                features: {
-                  enableTony: true,
-                  enableTonyVoice: true,
-                  enableTonyChat: true,
-                  enableGemini: true,
-                  enableGroq: true,
-                  maxProjects: 999
-                },
-                createdAt: Date.now()
-              };
-              setUser({
-                uid: adminUid,
-                email: adminEmail,
-                displayName: "System Administrator"
-              });
-              setUserProfile(adminProfile);
-              setIsDemoUser(false);
-              return;
+        if (verifyData.isAdmin && verifyData.user) {
+          // Attempt Firebase sign in to sync session if account exists
+          try {
+            await signInWithEmailAndPassword(auth, email, pass);
+          } catch (authErr: any) {
+            if (authErr.code === "auth/user-not-found" || authErr.code === "auth/invalid-credential") {
+              try {
+                await createUserWithEmailAndPassword(auth, email, pass);
+              } catch {
+                // Ignore firebase signup failure and proceed with root admin session
+              }
             }
-          } else {
-            throw authErr;
           }
+          setUser({
+            uid: verifyData.user.uid,
+            email: verifyData.user.email,
+            displayName: verifyData.user.displayName
+          });
+          setUserProfile(verifyData.user);
+          setIsDemoUser(false);
+          return;
         }
-        setIsDemoUser(false);
-        return;
+      } catch (adminCheckErr) {
+        console.warn("Server admin check bypassed:", adminCheckErr);
       }
 
+      // 2. Normal User Firebase Sign In
       await signInWithEmailAndPassword(auth, email, pass);
       setIsDemoUser(false);
     } finally {
