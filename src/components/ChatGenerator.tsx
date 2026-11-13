@@ -514,6 +514,7 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
     setIsAwake,
     transcript,
     audioLevel,
+    errorMsg: micErrorMsg,
     startListening,
     stopListening,
     speak
@@ -559,8 +560,8 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
         // Save to chat log so user sees Tony's answer in feed
         await saveChatMessage({
           projectId: project.id,
-          moduleId: activeModule?.id,
-          subModuleId: activeSubModule?.id,
+          moduleId: activeModule?.id || null,
+          subModuleId: activeSubModule?.id || null,
           sender: "ai",
           content: `[Tony]: ${data.reply}`,
           provider: "tony-gemini-live"
@@ -643,16 +644,22 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
       } catch { imgUrl = attachedImage; }
     }
 
-    const userMsg = await saveChatMessage({ 
-      projectId: project.id, 
-      moduleId: activeModule?.id, 
-      subModuleId: activeSubModule?.id, 
-      sender: "user", 
-      content: userText || "Attached UI Screenshot", 
-      sourceUrl: imgUrl || null, 
-      sourceType: currentSource 
-    });
-    onRefreshData();
+    let userMsgId: string | undefined;
+    try {
+      const userMsg = await saveChatMessage({ 
+        projectId: project.id, 
+        moduleId: activeModule?.id || null, 
+        subModuleId: activeSubModule?.id || null, 
+        sender: "user", 
+        content: userText || "Attached UI Screenshot", 
+        sourceUrl: imgUrl || null, 
+        sourceType: currentSource 
+      });
+      userMsgId = userMsg.id;
+      onRefreshData();
+    } catch (saveErr) {
+      console.warn("Could not save initial user message:", saveErr);
+    }
 
     try {
       setPipelineState("generating");
@@ -667,33 +674,33 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
       if (data.generatedCases?.length) {
         await saveChatMessage({
           projectId: project.id, 
-          moduleId: activeModule?.id, 
-          subModuleId: activeSubModule?.id,
+          moduleId: activeModule?.id || null, 
+          subModuleId: activeSubModule?.id || null, 
           sender: "ai",
           content: `Generated ${data.generatedCases.length} categorized, non-duplicate test cases based on structured context.`,
           provider: data.providerUsed || selectedProvider,
-          structuredContext: data.structuredContext,
+          structuredContext: data.structuredContext || null,
           generatedCases: data.generatedCases,
-          responseTo: userMsg.id,
+          responseTo: userMsgId || null,
         });
       } else {
         await saveChatMessage({ 
           projectId: project.id, 
-          moduleId: activeModule?.id, 
-          subModuleId: activeSubModule?.id,
+          moduleId: activeModule?.id || null, 
+          subModuleId: activeSubModule?.id || null, 
           sender: "ai", 
           content: `AI Generation Warning: ${data.error || "Falling back to structured rule generator."}`, 
-          responseTo: userMsg.id 
+          responseTo: userMsgId || null 
         });
       }
     } catch {
       await saveChatMessage({ 
         projectId: project.id, 
-        moduleId: activeModule?.id, 
-        subModuleId: activeSubModule?.id,
+        moduleId: activeModule?.id || null, 
+        subModuleId: activeSubModule?.id || null, 
         sender: "ai", 
         content: "Error communicating with AI Provider pipeline. Please try again.", 
-        responseTo: userMsg.id 
+        responseTo: userMsgId || null 
       });
     } finally {
       setIsGenerating(false);
@@ -1269,7 +1276,7 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-gray-400 max-w-lg mt-0.5 truncate">
-                  {tonyStatusText}
+                  {micErrorMsg ? <span className="text-rose-400 font-semibold">{micErrorMsg}</span> : tonyStatusText}
                 </p>
               </div>
             </div>

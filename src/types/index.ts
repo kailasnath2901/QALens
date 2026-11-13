@@ -103,18 +103,18 @@ export interface StructuredContext {
 export interface ChatMessage {
   id: string;
   projectId: string;
-  moduleId?: string;
-  subModuleId?: string;
+  moduleId?: string | null;
+  subModuleId?: string | null;
   sender: "user" | "ai";
   content: string;
   sourceType?: "image" | "text";
   sourceUrl?: string | null;
   provider?: string;
-  structuredContext?: StructuredContext;
+  structuredContext?: StructuredContext | null;
   generatedCases?: Omit<TestCase, "id" | "projectId" | "createdAt">[];
   timestamp: number;
   pipelineStep?: "done" | "extracting" | "generating";
-  responseTo?: string;
+  responseTo?: string | null;
 }
 
 export interface UsageLog {

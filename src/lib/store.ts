@@ -19,6 +19,29 @@ const CHATS_COLLECTION = "chats";
 const MODULES_COLLECTION = "modules";
 const SUBMODULES_COLLECTION = "submodules";
 
+/**
+ * Recursively removes all undefined fields from an object or array
+ * so Firestore setDoc/updateDoc never throws "Unsupported field value: undefined".
+ */
+export function cleanForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) return null as any;
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => cleanForFirestore(item)) as any;
+  }
+  if (typeof data === "object" && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
+
 export async function getProjects(userId: string): Promise<Project[]> {
   try {
     const q = query(
@@ -48,7 +71,7 @@ export async function saveProject(project: Omit<Project, "id" | "createdAt">): P
   };
 
   try {
-    await setDoc(doc(db, PROJECTS_COLLECTION, newId), newProj);
+    await setDoc(doc(db, PROJECTS_COLLECTION, newId), cleanForFirestore(newProj));
     return newProj;
   } catch (error) {
     console.error("Error saving project:", error);
@@ -84,7 +107,7 @@ export async function saveTestCase(testCase: Omit<TestCase, "id" | "createdAt">)
   };
 
   try {
-    await setDoc(doc(db, TESTCASES_COLLECTION, newId), newCase);
+    await setDoc(doc(db, TESTCASES_COLLECTION, newId), cleanForFirestore(newCase));
     
     // Update testCaseCount in the project doc
     const projectRef = doc(db, PROJECTS_COLLECTION, testCase.projectId);
@@ -106,7 +129,7 @@ export async function saveTestCase(testCase: Omit<TestCase, "id" | "createdAt">)
 export async function updateTestCase(caseId: string, updates: Partial<Omit<TestCase, "id" | "projectId" | "createdAt">>): Promise<void> {
   try {
     const caseRef = doc(db, TESTCASES_COLLECTION, caseId);
-    await updateDoc(caseRef, updates);
+    await updateDoc(caseRef, cleanForFirestore(updates));
   } catch (error) {
     console.error("Error updating test case:", error);
     throw error;
@@ -169,7 +192,7 @@ export async function saveChatMessage(chat: Omit<ChatMessage, "id" | "timestamp"
   };
 
   try {
-    await setDoc(doc(db, CHATS_COLLECTION, newId), newChat);
+    await setDoc(doc(db, CHATS_COLLECTION, newId), cleanForFirestore(newChat));
     return newChat;
   } catch (error) {
     console.error("Error saving chat message:", error);
@@ -224,7 +247,7 @@ export async function saveModule(module: Omit<Module, "id" | "createdAt" | "test
   };
 
   try {
-    await setDoc(doc(db, MODULES_COLLECTION, newId), newModule);
+    await setDoc(doc(db, MODULES_COLLECTION, newId), cleanForFirestore(newModule));
     return newModule;
   } catch (error) {
     console.error("Error saving module:", error);
@@ -328,7 +351,7 @@ export async function saveSubModule(subModule: Omit<SubModule, "id" | "createdAt
   };
 
   try {
-    await setDoc(doc(db, SUBMODULES_COLLECTION, newId), newSubModule);
+    await setDoc(doc(db, SUBMODULES_COLLECTION, newId), cleanForFirestore(newSubModule));
     return newSubModule;
   } catch (error) {
     console.error("Error saving sub module:", error);
@@ -645,7 +668,7 @@ export async function saveProjectDoc(docData: Omit<ProjectDoc, "id" | "createdAt
     createdAt: now,
     updatedAt: now
   };
-  await setDoc(doc(db, DOCS_COLLECTION, newId), newDoc);
+  await setDoc(doc(db, DOCS_COLLECTION, newId), cleanForFirestore(newDoc));
   return newDoc;
 }
 

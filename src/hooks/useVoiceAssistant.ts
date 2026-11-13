@@ -22,12 +22,32 @@ export function useVoiceAssistant({
   const [transcript, setTranscript] = useState("");
   const [supported, setSupported] = useState(true);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const recognitionRef = useRef<any>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const animFrameRef = useRef<number | null>(null);
+  const isListeningRef = useRef(false);
+  const pulseIntervalRef = useRef<any>(null);
+
+  // Keep ref in sync
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
+  // Clean animated pulse when listening
+  const startPulseAnimation = useCallback(() => {
+    if (pulseIntervalRef.current) clearInterval(pulseIntervalRef.current);
+    pulseIntervalRef.current = setInterval(() => {
+      setAudioLevel(Math.floor(Math.random() * 35) + 15);
+    }, 120);
+  }, []);
+
+  const stopPulseAnimation = useCallback(() => {
+    if (pulseIntervalRef.current) {
+      clearInterval(pulseIntervalRef.current);
+      pulseIntervalRef.current = null;
+    }
+    setAudioLevel(0);
+  }, []);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -47,55 +67,95 @@ export function useVoiceAssistant({
     recognition.lang = "en-US";
 
     recognition.onresult = (event: any) => {
-      let currentTranscript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        currentTranscript += event.results[i][0].transcript;
-      }
-      
-      const cleanLower = currentTranscript.toLowerCase().trim();
-      setTranscript(cleanLower);
+      let interim = "";
+      let finalSpeech = "";
 
-      // Trigger 1: Wake Word "Hey Tony" / "Tony"
-      if (cleanLower.includes("hey tony") || cleanLower.includes("hi tony") || cleanLower.endsWith("tony")) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const item = event.results[i];
+        if (item.isFinal) {
+          finalSpeech += item[0].transcript;
+        } else {
+          interim += item[0].transcript;
+        }
+      }
+
+      const activeText = (finalSpeech || interim).toLowerCase().trim();
+      if (activeText) {
+        setTranscript(activeText);
+        setAudioLevel(Math.floor(Math.random() * 45) + 40); // higher pulse on voice
+      }
+
+      // Check Wake Words: "Hey Tony", "Hi Tony", "OK Tony"
+      if (
+        activeText.includes("hey tony") ||
+        activeText.includes("hi tony") ||
+        activeText.includes("ok tony") ||
+        activeText.endsWith("tony")
+      ) {
         setIsAwake(true);
         if (onWakeWord) onWakeWord();
       }
 
-      // Trigger 2: Stop Word "Stop Tony" / "Pause Tony"
-      if (cleanLower.includes("stop tony") || cleanLower.includes("pause tony") || cleanLower.includes("shut up tony")) {
+      // Check Stop Words
+      if (
+        activeText.includes("stop tony") ||
+        activeText.includes("pause tony") ||
+        activeText.includes("shut up tony")
+      ) {
         setIsAwake(false);
         if (onStopWord) onStopWord();
+        return;
       }
 
-      // Trigger 3: Confirm Word "OK Tony" / "Okay Tony"
-      if (cleanLower.includes("ok tony") || cleanLower.includes("okay tony") || cleanLower.includes("thanks tony")) {
+      // Check Confirm Words
+      if (activeText.includes("thank you tony") || activeText.includes("thanks tony")) {
         setIsAwake(false);
         if (onConfirmWord) onConfirmWord();
+        return;
       }
 
       // Dispatch final transcript
-      if (event.results[event.results.length - 1].isFinal) {
-        if (onCommandTranscript && cleanLower) {
-          onCommandTranscript(cleanLower);
+      if (finalSpeech) {
+        let command = finalSpeech.trim();
+        // Strip wake phrase prefix if present
+        command = command.replace(/^(hey|hi|ok|okay)\s+tony[,.]?\s*/i, "").trim();
+        if (command && onCommandTranscript) {
+          onCommandTranscript(command);
         }
       }
     };
 
     recognition.onerror = (e: any) => {
-      // ignore normal aborts
-      if (e.error !== "no-speech") {
-        console.warn("Speech recognition error:", e.error);
+      if (e.error === "no-speech") {
+        // Normal silence timeout, no action needed
+        return;
+      }
+      if (e.error === "not-allowed") {
+        setErrorMsg("Microphone access was denied. Please allow mic permissions in Chrome.");
+        setIsListening(false);
+        isListeningRef.current = false;
+        stopPulseAnimation();
+      } else if (e.error === "audio-capture") {
+        setErrorMsg("Microphone device not available or already busy.");
+        setIsListening(false);
+        isListeningRef.current = false;
+        stopPulseAnimation();
+      } else {
+        console.warn("Speech recognition warning:", e.error);
       }
     };
 
     recognition.onend = () => {
-      // Auto-restart if still enabled
-      if (enabled && recognitionRef.current) {
+      // ONLY restart if the user intentionally keeps listening active
+      if (isListeningRef.current && recognitionRef.current) {
         try {
           recognitionRef.current.start();
         } catch {
-          // already started
+          // already restarting or busy
         }
+      } else {
+        setIsListening(false);
+        stopPulseAnimation();
       }
     };
 
@@ -106,94 +166,56 @@ export function useVoiceAssistant({
         recognition.stop();
       } catch {}
       recognitionRef.current = null;
+      stopPulseAnimation();
     };
-  }, [enabled, onWakeWord, onStopWord, onConfirmWord, onCommandTranscript]);
-
-  // Audio level meter using Web Audio API for reactive soundwaves
-  const startAudioMeter = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { 
-          echoCancellation: true, 
-          noiseSuppression: true, 
-          autoGainControl: true 
-        } 
-      });
-      micStreamRef.current = stream;
-
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      audioContextRef.current = audioCtx;
-
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
-      analyserRef.current = analyser;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const updateMeter = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / dataArray.length;
-        setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
-        animFrameRef.current = requestAnimationFrame(updateMeter);
-      };
-      updateMeter();
-    } catch (err) {
-      console.warn("Could not access microphone for meter:", err);
-    }
-  }, []);
-
-  const stopAudioMeter = useCallback(() => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
-    setAudioLevel(0);
-  }, []);
+  }, [onWakeWord, onStopWord, onConfirmWord, onCommandTranscript, stopPulseAnimation]);
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current) return;
     try {
+      setErrorMsg(null);
+      isListeningRef.current = true;
+      setIsListening(true);
+      startPulseAnimation();
       recognitionRef.current.start();
-      setIsListening(true);
-      startAudioMeter();
     } catch {
+      // In case it was already active
+      isListeningRef.current = true;
       setIsListening(true);
+      startPulseAnimation();
     }
-  }, [startAudioMeter]);
+  }, [startPulseAnimation]);
 
   const stopListening = useCallback(() => {
+    isListeningRef.current = false;
+    setIsListening(false);
+    setIsAwake(false);
+    stopPulseAnimation();
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch {}
     }
-    setIsListening(false);
-    setIsAwake(false);
-    stopAudioMeter();
-  }, [stopAudioMeter]);
+  }, [stopPulseAnimation]);
 
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
-    // pick clean natural voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha")));
-    if (naturalVoice) utterance.voice = naturalVoice;
-    window.speechSynthesis.speak(utterance);
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      const voices = window.speechSynthesis.getVoices();
+      const naturalVoice = voices.find(
+        (v) =>
+          v.lang.startsWith("en") &&
+          (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha") || v.name.includes("David"))
+      );
+      if (naturalVoice) utterance.voice = naturalVoice;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("TTS error:", e);
+    }
   }, []);
 
   return {
@@ -203,8 +225,9 @@ export function useVoiceAssistant({
     transcript,
     audioLevel,
     supported,
+    errorMsg,
     startListening,
     stopListening,
-    speak
+    speak,
   };
 }
