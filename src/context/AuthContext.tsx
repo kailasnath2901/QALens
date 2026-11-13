@@ -33,14 +33,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (userDocSnap.exists()) {
         const stored = userDocSnap.data();
-        const role = stored.role || (email === process.env.NEXT_PUBLIC_ADMIN_EMAIL ? "admin" : "user");
-        const status = stored.status || (role === "admin" ? "approved" : "pending");
+        const isSystemAdmin = 
+          stored.role === "admin" || 
+          (email && email.toLowerCase() === "admin@qalens.com");
+        const role = isSystemAdmin ? "admin" : (stored.role || "user");
+        const status = isSystemAdmin ? "approved" : (stored.status || "pending");
         const features: UserFeatures = stored.features || {
-          enableTony: role === "admin",
-          enableTonyVoice: role === "admin",
-          enableTonyChat: role === "admin",
-          enableGemini: role === "admin",
-          enableGroq: role === "admin",
+          enableTony: isSystemAdmin,
+          enableTonyVoice: isSystemAdmin,
+          enableTonyChat: isSystemAdmin,
+          enableGemini: isSystemAdmin,
+          enableGroq: isSystemAdmin,
           maxProjects: 10
         };
 
@@ -57,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           approvedBy: stored.approvedBy || null
         });
       } else {
-        const isAdmin = email && process.env.NEXT_PUBLIC_ADMIN_EMAIL && email.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase();
+        const isAdmin = email && email.toLowerCase() === "admin@qalens.com";
         const newProfile: UserProfile = {
           uid,
           email: email || "",
@@ -132,12 +135,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             }
           }
+          const adminProfile: UserProfile = {
+            ...verifyData.user,
+            role: "admin",
+            status: "approved"
+          };
           setUser({
             uid: verifyData.user.uid,
             email: verifyData.user.email,
             displayName: verifyData.user.displayName
           });
-          setUserProfile(verifyData.user);
+          setUserProfile(adminProfile);
+
+          // Save / update admin doc in Firestore so onAuthStateChanged always sees approved admin
+          try {
+            await setDoc(doc(db, "users", verifyData.user.uid), adminProfile, { merge: true });
+          } catch {}
+
           setIsDemoUser(false);
           return;
         }

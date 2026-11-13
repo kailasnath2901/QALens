@@ -237,8 +237,10 @@ export default function Home() {
   }
 
   // Pending / Rejected Approval Gate for Non-Admins
-  const isAdmin = userProfile?.role === "admin" || (process.env.NEXT_PUBLIC_ADMIN_EMAIL && user.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase());
-  const accountStatus = userProfile?.status || "pending";
+  const isAdmin = 
+    userProfile?.role === "admin" || 
+    (user.email && user.email.toLowerCase() === "admin@qalens.com");
+  const accountStatus = userProfile?.status || (isAdmin ? "approved" : "pending");
 
   if (!isDemoUser && !isAdmin && accountStatus !== "approved") {
     return (

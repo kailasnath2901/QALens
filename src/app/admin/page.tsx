@@ -31,9 +31,8 @@ export default function AdminDashboardPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | AccountStatus>("all");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const adminEmailEnv = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
   const currentEmail = userProfile?.email?.toLowerCase() || user?.email?.toLowerCase();
-  const isAdmin = userProfile?.role === "admin" || (adminEmailEnv && currentEmail === adminEmailEnv);
+  const isAdmin = userProfile?.role === "admin" || currentEmail === "admin@qalens.com";
 
   const loadUsersList = async () => {
     setFetching(true);
