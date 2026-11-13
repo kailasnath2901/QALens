@@ -170,33 +170,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signupWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     try {
-      const res = await createUserWithEmailAndPassword(auth, email, pass);
-      if (res.user) {
-        // Ensure the newly registered user document is created in Firestore immediately
-        const userDocRef = doc(db, "users", res.user.uid);
-        const newProfile: UserProfile = {
-          uid: res.user.uid,
-          email: res.user.email || email,
-          displayName: email.split("@")[0],
-          photoURL: null,
-          role: "user",
-          status: "pending",
-          features: {
-            enableTony: false,
-            enableTonyVoice: false,
-            enableTonyChat: false,
-            enableGemini: false,
-            enableGroq: false,
-            maxProjects: 10
-          },
-          createdAt: Date.now(),
-          approvedAt: null,
-          approvedBy: null
-        };
-        await setDoc(userDocRef, newProfile);
-        setUser(res.user);
-        setUserProfile(newProfile);
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      const isSysAdmin = email.toLowerCase() === "admin@qalens.com";
+      const initialProfile: UserProfile = {
+        uid: cred.user.uid,
+        email: email,
+        displayName: email.split("@")[0],
+        photoURL: null,
+        role: isSysAdmin ? "admin" : "user",
+        status: isSysAdmin ? "approved" : "pending",
+        features: {
+          enableTony: isSysAdmin,
+          enableTonyVoice: isSysAdmin,
+          enableTonyChat: isSysAdmin,
+          enableGemini: isSysAdmin,
+          enableGroq: isSysAdmin,
+          maxProjects: 10
+        },
+        createdAt: Date.now(),
+        approvedAt: isSysAdmin ? Date.now() : null,
+        approvedBy: isSysAdmin ? "system_init" : null
+      };
+
+      try {
+        await setDoc(doc(db, "users", cred.user.uid), initialProfile, { merge: true });
+      } catch (saveErr) {
+        console.error("Failed to write initial user doc to Firestore:", saveErr);
       }
+
+      setUserProfile(initialProfile);
       setIsDemoUser(false);
     } finally {
       setLoading(false);

@@ -15,8 +15,14 @@ function formatFirebaseError(err: unknown): string {
   if (raw.includes("email-already-in-use")) {
     return "This email address is already registered. Switch to 'Sign In' to log into your account.";
   }
-  if (raw.includes("invalid-credential") || raw.includes("user-not-found") || raw.includes("wrong-password")) {
-    return "Invalid email or password. Please verify your credentials and try again.";
+  if (raw.includes("user-not-found")) {
+    return "Account not registered yet! Please click 'Create an account' below to sign up first, then an admin will approve your workspace access.";
+  }
+  if (raw.includes("invalid-credential")) {
+    return "Account not found or password incorrect. If you haven't registered yet, please switch to 'Create an account' below to sign up first!";
+  }
+  if (raw.includes("wrong-password")) {
+    return "Incorrect password. Please verify your password or reset it.";
   }
   if (raw.includes("invalid-email")) {
     return "Please enter a valid email address.";
