@@ -95,15 +95,15 @@ export function Navbar({
 
           <button
             onClick={() => setActiveTab("generator")}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === "generator"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : theme === "dark" ? "text-gray-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 text-white shadow-md shadow-indigo-600/30"
+                : theme === "dark" ? "text-cyan-400 hover:text-white" : "text-indigo-600 hover:text-indigo-900"
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Generate Test Cases</span>
-            <span className="sm:hidden">Generate</span>
+            <Sparkles className="w-3.5 h-3.5 animate-pulse text-cyan-300" />
+            <span className="hidden sm:inline">Tony AI Generator</span>
+            <span className="sm:hidden">Tony AI</span>
           </button>
 
           <button

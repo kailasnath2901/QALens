@@ -57,8 +57,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Call Gemini model as "Tony"
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    // 2. Call Gemini model as "Tony" with multi-model fallback & Groq backup
     const systemPrompt = `You are "Tony", an elite, autonomous AI QA Architect and Lead Automation Engineer for QALens (inspired by JARVIS).
 Your demeanor: confident, razor-sharp, concise, proactive, and technically supreme.
 When spoken to or chatting:
@@ -74,12 +73,55 @@ Instructions:
 2. If asked to generate test scenarios, outline them clearly with preconditions, action, and expected behavior.
 3. Keep spoken voice responses punchy and natural (under 4-5 sentences when possible) while answering questions precisely.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: `${systemPrompt}\n\nUser: ${message}\n\nTony:`,
-    });
+    let reply = "";
+    const geminiModels = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash"];
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    const reply = response.text || "I've analyzed the request, but encountered no output. How else may I assist you?";
+    for (const modelName of geminiModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: `${systemPrompt}\n\nUser: ${message}\n\nTony:`,
+        });
+        if (response && response.text) {
+          reply = response.text.trim();
+          break;
+        }
+      } catch (gemErr: any) {
+        console.warn(`Gemini model ${modelName} error:`, gemErr?.message?.slice(0, 100));
+      }
+    }
+
+    // Groq fallback if Gemini models failed or throttled
+    if (!reply && process.env.GROQ_API_KEY) {
+      try {
+        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "qwen/qwen3.8-27b",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: message }
+            ],
+            max_tokens: 2048,
+          }),
+        });
+        if (groqRes.ok) {
+          const groqData = await groqRes.json();
+          reply = groqData.choices?.[0]?.message?.content?.trim() || "";
+        }
+      } catch (groqErr) {
+        console.warn("Groq backup fallback error:", groqErr);
+      }
+    }
+
+    if (!reply) {
+      reply = "I've analyzed the request, but encountered no output from the neural engine. How else may I assist you?";
+    }
 
     return NextResponse.json({
       success: true,

@@ -4,9 +4,9 @@ import { StructuredContext, TestCase } from "@/types";
 
 export const maxDuration = 60;
 
-const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"];
-const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
-const GROQ_TEXT_MODEL = "llama-3.3-70b-versatile";
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash"];
+const GROQ_VISION_MODEL = "qwen/qwen3.8-27b";
+const GROQ_TEXT_MODEL = "qwen/qwen3.8-27b";
 
 function cleanAIResponse(text: string, expectArray: boolean = false): string {
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
@@ -329,21 +329,42 @@ Valid categories: "functional", "input_validation", "error_handling", "boundary_
 
   // Gemini
   if (!geminiKey) throw new Error("Gemini API key missing");
-  try {
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const response = await ai.models.generateContent({
-      model: resolvedModel,
-      contents: promptText,
-      config: { responseMimeType: "application/json" },
-    });
-    if (response.text) {
-      try {
-        const parsed = JSON.parse(response.text);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {}
+  const modelsToTry = [resolvedModel, ...GEMINI_MODELS.filter(m => m !== resolvedModel)];
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
+
+  for (const m of modelsToTry) {
+    try {
+      console.log(`Step 2: Trying Gemini model ${m}...`);
+      const response = await ai.models.generateContent({
+        model: m,
+        contents: promptText,
+        config: { responseMimeType: "application/json" },
+      });
+      if (response.text) {
+        try {
+          const parsed = JSON.parse(response.text);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    } catch (e: any) {
+      console.warn(`Step 2 Gemini model ${m} failed:`, e?.message?.slice(0, 100));
     }
-  } catch (e) {
-    console.error(`Step 2 Gemini error (${resolvedModel}):`, e);
   }
+
+  // Fallback to Groq if all Gemini models failed
+  if (groqKey) {
+    try {
+      console.log(`Step 2: Fallback to Groq ${GROQ_TEXT_MODEL}...`);
+      const content = await callGroqChat(groqKey, [{ role: "user", content: promptText }], GROQ_TEXT_MODEL);
+      if (content) {
+        const cleanJson = cleanAIResponse(content, true);
+        const parsed = JSON.parse(cleanJson);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (groqErr) {
+      console.warn("Step 2 Groq fallback error:", groqErr);
+    }
+  }
+
   return [];
 }
