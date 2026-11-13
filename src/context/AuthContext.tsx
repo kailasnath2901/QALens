@@ -170,7 +170,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signupWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, pass);
+      const res = await createUserWithEmailAndPassword(auth, email, pass);
+      if (res.user) {
+        // Ensure the newly registered user document is created in Firestore immediately
+        const userDocRef = doc(db, "users", res.user.uid);
+        const newProfile: UserProfile = {
+          uid: res.user.uid,
+          email: res.user.email || email,
+          displayName: email.split("@")[0],
+          photoURL: null,
+          role: "user",
+          status: "pending",
+          features: {
+            enableTony: false,
+            enableTonyVoice: false,
+            enableTonyChat: false,
+            enableGemini: false,
+            enableGroq: false,
+            maxProjects: 10
+          },
+          createdAt: Date.now(),
+          approvedAt: null,
+          approvedBy: null
+        };
+        await setDoc(userDocRef, newProfile);
+        setUser(res.user);
+        setUserProfile(newProfile);
+      }
       setIsDemoUser(false);
     } finally {
       setLoading(false);
