@@ -1,10 +1,25 @@
+export type AccountStatus = "pending" | "approved" | "rejected";
+
+export interface UserFeatures {
+  enableTony: boolean;
+  enableTonyVoice: boolean;
+  enableTonyChat: boolean;
+  enableGemini: boolean;
+  enableGroq: boolean;
+  maxProjects?: number;
+}
+
 export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
-  role?: string;
+  role?: "admin" | "user" | string;
+  status?: AccountStatus;
+  features?: UserFeatures;
   createdAt: number;
+  approvedAt?: number | null;
+  approvedBy?: string | null;
 }
 
 export interface Project {
@@ -14,6 +29,17 @@ export interface Project {
   description: string;
   createdAt: number;
   testCaseCount?: number;
+}
+
+export interface ProjectDoc {
+  id: string;
+  projectId: string;
+  moduleId?: string | null;
+  subModuleId?: string | null;
+  title: string;
+  content: string;
+  updatedAt: number;
+  createdAt: number;
 }
 
 export interface Module {

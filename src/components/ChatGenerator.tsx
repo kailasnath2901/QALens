@@ -23,6 +23,11 @@ import {
   Edit3,
   Loader2,
   Box,
+  Mic,
+  MicOff,
+  Volume2,
+  Bot,
+  MessageSquare
 } from "lucide-react";
 import { ChatMessage, TestCase, Project, ProviderInfo, Module, SubModule } from "@/types";
 import providerLimits from "@/config/providerLimits.json";
@@ -30,6 +35,7 @@ import { logProviderUsage, calculateProviderStats, ProviderQuotaStats } from "@/
 import { saveChatMessage, saveTestCase, deleteTestCase, deleteChatMessage } from "@/lib/store";
 import { useAuth } from "@/context/AuthContext";
 import { uploadImageToCloudinary } from "@/lib/upload";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 
 interface ChatGeneratorProps {
   project: Project;
@@ -474,8 +480,8 @@ function ReviewStoreModal({ isOpen, onClose, onSave, initialCase }: ReviewStoreM
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function ChatGenerator({ project, chats, existingCases, onRefreshData, activeModule, activeSubModule, isLoading = false }: ChatGeneratorProps) {
-  const { user, isDemoUser } = useAuth();
-  const [selectedProvider, setSelectedProvider] = useState<string>("grok-2");
+  const { user, userProfile, isDemoUser } = useAuth();
+  const [selectedProvider, setSelectedProvider] = useState<string>("gemini");
   const [isModelOpen, setIsModelOpen] = useState(false);
   const modelBtnRef = useRef<HTMLButtonElement>(null);
   const [inputPrompt, setInputPrompt] = useState("");
@@ -487,6 +493,88 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
   const [caseKeyToFirestoreId, setCaseKeyToFirestoreId] = useState<Record<string, string>>({});
   const [deletingCaseKey, setDeletingCaseKey] = useState<string | null>(null);
   const [storingAllForMsg, setStoringAllForMsg] = useState<string | null>(null);
+
+  // Tony Assistant Dual Mode (Chat / Voice)
+  const userFeatures = userProfile?.features || {
+    enableTony: false,
+    enableTonyVoice: false,
+    enableTonyChat: false
+  };
+  const isTonyEnabled = !!userFeatures.enableTony;
+  const isVoiceAllowed = isTonyEnabled && !!userFeatures.enableTonyVoice;
+  const isChatAllowed = isTonyEnabled && !!userFeatures.enableTonyChat;
+
+  const [assistantMode, setAssistantMode] = useState<"chat" | "voice">(isVoiceAllowed ? "voice" : "chat");
+  const [tonyStatusText, setTonyStatusText] = useState<string>("Tony is in standby. Say 'Hey Tony' or tap to speak.");
+
+  // Voice Assistant Hook
+  const {
+    isListening,
+    isAwake,
+    setIsAwake,
+    transcript,
+    audioLevel,
+    startListening,
+    stopListening,
+    speak
+  } = useVoiceAssistant({
+    enabled: isVoiceAllowed,
+    onWakeWord: () => {
+      setTonyStatusText("Listening for your QA command...");
+    },
+    onStopWord: () => {
+      setTonyStatusText("Tony paused. Say 'Hey Tony' to resume.");
+    },
+    onConfirmWord: () => {
+      setTonyStatusText("Standing by.");
+    },
+    onCommandTranscript: (voiceCommand) => {
+      handleTonyVoiceQuery(voiceCommand);
+    }
+  });
+
+  const handleTonyVoiceQuery = async (queryText: string) => {
+    if (!queryText.trim() || isGenerating) return;
+    setIsGenerating(true);
+    setTonyStatusText(`Analyzing: "${queryText}"...`);
+
+    try {
+      const res = await fetch("/api/tony", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: queryText,
+          projectId: project.id,
+          moduleId: activeModule?.id,
+          subModuleId: activeSubModule?.id,
+          projectName: project.name
+        })
+      });
+      const data = await res.json();
+      if (data.reply) {
+        setTonyStatusText(data.reply);
+        if (data.spokenText) {
+          speak(data.spokenText);
+        }
+        // Save to chat log so user sees Tony's answer in feed
+        await saveChatMessage({
+          projectId: project.id,
+          moduleId: activeModule?.id,
+          subModuleId: activeSubModule?.id,
+          sender: "ai",
+          content: `[Tony]: ${data.reply}`,
+          provider: "tony-gemini-live"
+        });
+        onRefreshData();
+      }
+    } catch (err) {
+      console.error("Tony query error:", err);
+      setTonyStatusText("Sorry, I could not process that request.");
+    } finally {
+      setIsGenerating(false);
+      setIsAwake(false);
+    }
+  };
 
   // New States for Reviewing, Removing, and live AI Usage Stats
   const [removedCaseKeys, setRemovedCaseKeys] = useState<Set<string>>(new Set());
@@ -765,8 +853,41 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
           )}
         </div>
 
-        {/* Right metrics */}
+        {/* Mode switch & Right metrics */}
         <div className="flex items-center gap-3 text-xs">
+          {isTonyEnabled && (
+            <div className="flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-gray-800 bg-slate-100 dark:bg-gray-900">
+              {isVoiceAllowed && (
+                <button
+                  type="button"
+                  onClick={() => setAssistantMode("voice")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    assistantMode === "voice"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Tony Voice</span>
+                </button>
+              )}
+              {isChatAllowed && (
+                <button
+                  type="button"
+                  onClick={() => setAssistantMode("chat")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    assistantMode === "chat"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Chat</span>
+                </button>
+              )}
+            </div>
+          )}
+
           <span className="hidden lg:flex items-center gap-1.5 text-slate-400 dark:text-gray-500">
             Usage: <span className="font-mono text-indigo-500 dark:text-indigo-400 font-bold">{usageStats[selectedProvider]?.rpmUsed || 0}</span> / <span className="font-mono text-indigo-300">{currentProviderObj.rpm}</span> RPM
           </span>
@@ -1101,32 +1222,97 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
       </div>
       )}
 
-      {/* ─── Bottom Prompt Bar (show when module is selected) ─── */}
+      {/* ─── Bottom Prompt Bar or Tony Voice HUD (show when module is selected) ─── */}
       {activeModule && (
-      <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-gray-800/80 bg-white/80 dark:bg-[#0a0d14]/90 backdrop-blur-md">
-        {attachedImage && (
-          <div className="mb-2 inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-gray-800/80 border border-slate-300 dark:border-gray-700 rounded-xl text-xs text-indigo-400">
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span className="font-medium">Screenshot Attached</span>
-            <button onClick={removeAttachment} className="hover:text-red-400 ml-1 transition-colors">
-              <X className="w-3.5 h-3.5" />
-            </button>
+        assistantMode === "voice" && isVoiceAllowed ? (
+          /* Tony Voice Mode HUD */
+          <div className="p-4 border-t border-slate-200 dark:border-gray-800/80 bg-white/95 dark:bg-[#0a0d14]/95 backdrop-blur-md flex flex-col items-center justify-center gap-3">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isListening) stopListening();
+                  else startListening();
+                }}
+                className={`relative w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                  isAwake
+                    ? "bg-gradient-to-tr from-cyan-500 to-indigo-500 text-white shadow-cyan-500/30 scale-110"
+                    : isListening
+                    ? "bg-indigo-600 text-white shadow-indigo-600/30"
+                    : "bg-slate-200 dark:bg-gray-800 text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
+                title={isListening ? "Listening... (Say 'Hey Tony' or speak command)" : "Tap to activate Tony"}
+              >
+                {/* Audio pulse ring */}
+                {isListening && (
+                  <span
+                    className="absolute inset-0 rounded-full border-2 border-indigo-400 animate-ping opacity-40 pointer-events-none"
+                    style={{ transform: `scale(${1 + audioLevel / 60})` }}
+                  />
+                )}
+                {isListening ? <Mic className="w-6 h-6 animate-pulse" /> : <MicOff className="w-6 h-6" />}
+              </button>
+
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Bot className="w-4 h-4 text-cyan-400" /> Tony Voice Assistant
+                  </span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                    isAwake 
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" 
+                      : isListening 
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" 
+                      : "bg-slate-500/20 text-slate-400 border border-slate-500/40"
+                  }`}>
+                    {isAwake ? "Awake & Processing" : isListening ? "Standing By" : "Muted"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-gray-400 max-w-lg mt-0.5 truncate">
+                  {tonyStatusText}
+                </p>
+              </div>
+            </div>
+
+            {/* Voice hint pills */}
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-gray-500 font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-gray-800/60 border border-slate-200 dark:border-gray-800">
+                "Hey Tony, give me a summary of notes"
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-gray-800/60 border border-slate-200 dark:border-gray-800">
+                "Stop Tony"
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-gray-800/60 border border-slate-200 dark:border-gray-800">
+                "OK Tony"
+              </span>
+            </div>
           </div>
-        )}
+        ) : (
+          /* Standard Chat Input Mode */
+          <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-gray-800/80 bg-white/80 dark:bg-[#0a0d14]/90 backdrop-blur-md">
+            {attachedImage && (
+              <div className="mb-2 inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-gray-800/80 border border-slate-300 dark:border-gray-700 rounded-xl text-xs text-indigo-400">
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span className="font-medium">Screenshot Attached</span>
+                <button onClick={removeAttachment} className="hover:text-red-400 ml-1 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
-        <div className="flex items-end gap-2 bg-white dark:bg-gray-900/90 border border-slate-200 dark:border-gray-800 focus-within:border-indigo-500/60 rounded-2xl p-2 transition-all shadow-sm">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            accept="image/*,.txt,.doc,.pdf"
-            className="hidden"
-          />
+            <div className="flex items-end gap-2 bg-white dark:bg-gray-900/90 border border-slate-200 dark:border-gray-800 focus-within:border-indigo-500/60 rounded-2xl p-2 transition-all shadow-sm">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*,.txt,.doc,.pdf"
+                className="hidden"
+              />
 
-          {/* Attach btn — hidden for text-only models */}
-          {!isTextOnlyModel && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
+              {/* Attach btn — hidden for text-only models */}
+              {!isTextOnlyModel && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
               className="p-2 rounded-xl text-slate-400 dark:text-gray-500 hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
               title="Attach Screenshot or Requirement File"
             >
@@ -1165,6 +1351,7 @@ export function ChatGenerator({ project, chats, existingCases, onRefreshData, ac
           </button>
         </div>
       </div>
+        )
       )}
 
       {editingCase && editingCaseKey && (

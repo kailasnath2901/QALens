@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { Sparkles, Database, Gauge, LogIn, LogOut, ChevronRight, Sun, Moon, Menu, Layers } from "lucide-react";
+import Link from "next/link";
+import { Sparkles, Database, Gauge, LogIn, LogOut, ChevronRight, Sun, Moon, Menu, Layers, ShieldCheck, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Project } from "@/types";
@@ -10,8 +11,8 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface NavbarProps {
   activeProject: Project | null;
-  activeTab: "tasks" | "generator" | "repository";
-  setActiveTab: (tab: "tasks" | "generator" | "repository") => void;
+  activeTab: "tasks" | "generator" | "repository" | "docs";
+  setActiveTab: (tab: "tasks" | "generator" | "repository" | "docs") => void;
   onOpenUsageModal: () => void;
   onOpenAuthModal: () => void;
   onOpenUserProfileModal?: () => void;
@@ -120,6 +121,19 @@ export function Navbar({
               {storedCount}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("docs")}
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === "docs"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : theme === "dark" ? "text-gray-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Specs & Docs</span>
+            <span className="sm:hidden">Docs</span>
+          </button>
         </div>
       )}
 
@@ -147,6 +161,18 @@ export function Navbar({
           <Gauge className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
           <span className="hidden md:inline">AI Limits</span>
         </button>
+
+        {/* Admin Dashboard Pill for Admins */}
+        {(userProfile?.role === "admin" || (process.env.NEXT_PUBLIC_ADMIN_EMAIL && user?.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase())) && (
+          <Link
+            href="/admin"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all shadow-sm"
+            title="Open QALens Admin Console"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Admin Console</span>
+          </Link>
+        )}
 
         {user ? (
           <div className="flex items-center gap-2">

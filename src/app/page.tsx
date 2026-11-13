@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatGenerator } from "@/components/ChatGenerator";
 import { StoredTestCases } from "@/components/StoredTestCases";
+import { DocumentWorkspace } from "@/components/DocumentWorkspace";
 import TaskBoard from "@/components/TaskBoard";
 import { AuthModal } from "@/components/AuthModal";
 import { UsageMetersModal } from "@/components/UsageMetersModal";
@@ -33,12 +34,12 @@ import {
 import { Project, TestCase, ChatMessage, Module, SubModule } from "@/types";
 
 export default function Home() {
-  const { user, isDemoUser, loading } = useAuth();
+  const { user, userProfile, isDemoUser, loading, logout } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
-  const [activeTab, setActiveTab] = useState<"tasks" | "generator" | "repository">("generator");
+  const [activeTab, setActiveTab] = useState<"tasks" | "generator" | "repository" | "docs">("generator");
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [chats, setChats] = useState<ChatMessage[]>([]);
 
@@ -235,6 +236,43 @@ export default function Home() {
     return <LandingPage onOpenLogin={() => setShowLogin(true)} />;
   }
 
+  // Pending / Rejected Approval Gate for Non-Admins
+  const isAdmin = userProfile?.role === "admin" || (process.env.NEXT_PUBLIC_ADMIN_EMAIL && user.email?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase());
+  const accountStatus = userProfile?.status || "pending";
+
+  if (!isDemoUser && !isAdmin && accountStatus !== "approved") {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur">
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <svg className="w-8 h-8 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold mb-2">
+            {accountStatus === "rejected" ? "Access Denied" : "Account Pending Approval"}
+          </h2>
+          <p className="text-sm text-slate-400 mb-6">
+            {accountStatus === "rejected"
+              ? "Your account request was declined by the administrator. Please contact your QA Lead if this is in error."
+              : "Welcome to QALens! Your account has been registered and is currently waiting for admin approval before you can access project workspaces."}
+          </p>
+          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 mb-6 text-xs text-left text-slate-400 font-mono">
+            <div><strong>User:</strong> {userProfile?.displayName || user.email}</div>
+            <div><strong>Email:</strong> {user.email}</div>
+            <div><strong>Status:</strong> <span className={accountStatus === "rejected" ? "text-red-400 font-bold" : "text-amber-400 font-bold"}>{accountStatus.toUpperCase()}</span></div>
+          </div>
+          <button
+            onClick={() => logout()}
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-all"
+          >
+            Sign Out & Switch Account
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col font-sans transition-colors duration-300 overflow-hidden">
       {/* Top Navbar Header */}
@@ -301,7 +339,7 @@ export default function Home() {
               activeSubModule={activeSubModule}
               isLoading={isSwitching}
             />
-          ) : (
+          ) : activeTab === "repository" ? (
             <StoredTestCases
               project={activeProject}
               testCases={testCases}
@@ -310,6 +348,13 @@ export default function Home() {
               activeModule={activeModule}
               activeSubModule={activeSubModule}
               isLoading={isSwitching}
+            />
+          ) : (
+            <DocumentWorkspace
+              projectId={activeProject.id}
+              moduleId={activeModule?.id}
+              subModuleId={activeSubModule?.id}
+              moduleName={activeSubModule?.name || activeModule?.name}
             />
           )
         ) : (

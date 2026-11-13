@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { UserProfile } from "@/types";
+import { UserProfile, UserFeatures } from "@/types";
 
 interface AuthContextType {
   user: User | { uid: string; email: string; displayName: string; photoURL?: string } | null;
@@ -33,22 +33,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (userDocSnap.exists()) {
         const stored = userDocSnap.data();
+        const role = stored.role || (email === process.env.NEXT_PUBLIC_ADMIN_EMAIL ? "admin" : "user");
+        const status = stored.status || (role === "admin" ? "approved" : "pending");
+        const features: UserFeatures = stored.features || {
+          enableTony: role === "admin",
+          enableTonyVoice: role === "admin",
+          enableTonyChat: role === "admin",
+          enableGemini: role === "admin",
+          enableGroq: role === "admin",
+          maxProjects: 10
+        };
+
         setUserProfile({
           uid,
           email: email || stored.email || "",
           displayName: fallbackName || stored.displayName || "",
           photoURL: photoURL || stored.photoURL || "",
-          role: stored.role || "",
-          createdAt: stored.createdAt || Date.now()
+          role,
+          status,
+          features,
+          createdAt: stored.createdAt || Date.now(),
+          approvedAt: stored.approvedAt || null,
+          approvedBy: stored.approvedBy || null
         });
       } else {
-        const newProfile = {
+        const isAdmin = email && process.env.NEXT_PUBLIC_ADMIN_EMAIL && email.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_EMAIL.toLowerCase();
+        const newProfile: UserProfile = {
           uid,
           email: email || "",
           displayName: fallbackName || "",
           photoURL: photoURL || "",
-          role: "",
-          createdAt: Date.now()
+          role: isAdmin ? "admin" : "user",
+          status: isAdmin ? "approved" : "pending",
+          features: {
+            enableTony: !!isAdmin,
+            enableTonyVoice: !!isAdmin,
+            enableTonyChat: !!isAdmin,
+            enableGemini: !!isAdmin,
+            enableGroq: !!isAdmin,
+            maxProjects: 10
+          },
+          createdAt: Date.now(),
+          approvedAt: isAdmin ? Date.now() : null,
+          approvedBy: isAdmin ? "system_init" : null
         };
         setUserProfile(newProfile);
         // Save initial profile
@@ -83,6 +110,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     try {
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+      const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+
+      // Check if credentials match the configured Admin in env
+      if (
+        adminEmail && 
+        adminPassword && 
+        email.toLowerCase() === adminEmail.toLowerCase() && 
+        pass === adminPassword
+      ) {
+        try {
+          // Attempt standard sign in
+          await signInWithEmailAndPassword(auth, email, pass);
+        } catch (authErr: any) {
+          // If user doesn't exist in Firebase yet, auto-provision the admin account
+          if (authErr.code === "auth/user-not-found" || authErr.code === "auth/invalid-credential") {
+            try {
+              await createUserWithEmailAndPassword(auth, email, pass);
+            } catch {
+              // Fallback to local admin session if Firebase account creation fails
+              const adminUid = "admin_master_root";
+              const adminProfile: UserProfile = {
+                uid: adminUid,
+                email: adminEmail,
+                displayName: "System Administrator",
+                role: "admin",
+                status: "approved",
+                features: {
+                  enableTony: true,
+                  enableTonyVoice: true,
+                  enableTonyChat: true,
+                  enableGemini: true,
+                  enableGroq: true,
+                  maxProjects: 999
+                },
+                createdAt: Date.now()
+              };
+              setUser({
+                uid: adminUid,
+                email: adminEmail,
+                displayName: "System Administrator"
+              });
+              setUserProfile(adminProfile);
+              setIsDemoUser(false);
+              return;
+            }
+          } else {
+            throw authErr;
+          }
+        }
+        setIsDemoUser(false);
+        return;
+      }
+
       await signInWithEmailAndPassword(auth, email, pass);
       setIsDemoUser(false);
     } finally {

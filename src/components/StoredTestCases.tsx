@@ -19,7 +19,9 @@ import {
   X,
   ListPlus,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Table as TableIcon,
+  LayoutGrid
 } from "lucide-react";
 import { TestCase, TestCaseCategory, Project, Module, SubModule } from "@/types";
 import { saveTestCase, updateTestCase, deleteTestCase } from "@/lib/store";
@@ -66,6 +68,7 @@ export function StoredTestCases({
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "grid">("grid");
 
   // Quick-Add Bottom Bar State
   const [quickTitle, setQuickTitle] = useState("");
@@ -431,6 +434,32 @@ export function StoredTestCases({
               ))}
             </select>
           </div>
+
+          {/* AppFlowy Layout Toggle */}
+          <div className="flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-1 rounded-md text-xs transition-all ${
+                viewMode === "grid" 
+                  ? "bg-indigo-600 text-white shadow-sm" 
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              }`}
+              title="Table View (AppFlowy Grid)"
+            >
+              <TableIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("cards")}
+              className={`p-1 rounded-md text-xs transition-all ${
+                viewMode === "cards" 
+                  ? "bg-indigo-600 text-white shadow-sm" 
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              }`}
+              title="Card View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -525,81 +554,153 @@ export function StoredTestCases({
         </form>
       )}
 
-      {/* Main Repository List (only show when submodule is selected) */}
+      {/* Main Repository View (only show when submodule is selected) */}
       {activeSubModule && (
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4">
         {filteredCases.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
             <Database className="w-12 h-12 text-gray-600 mb-3" />
             <h4 className="text-sm font-semibold text-slate-600 dark:text-gray-300 mb-1">
-              No test cases stored yet in this project
+              No test cases stored yet in this submodule
             </h4>
             <p className="text-xs text-slate-400 dark:text-gray-500 max-w-sm">
-              Use the AI Chat Generator to generate test cases or use the bottom quick-add bar below to store test cases!
+              Use the AI Chat Generator to generate test cases or use the quick-add bar above to store test cases!
             </p>
           </div>
-        ) : (
-          filteredCases.map((tc) => {
-            return (
-              <div
-                key={tc.id}
-                className="bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-xl p-4 transition-all hover:border-slate-300 dark:border-gray-700"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 cursor-pointer" onClick={() => setSelectedCaseId(tc.id)}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-xs text-slate-900 dark:text-white hover:text-indigo-300">
+        ) : viewMode === "grid" ? (
+          /* AppFlowy Spreadsheet-Style Grid View */
+          <div className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-gray-950/80 text-slate-500 dark:text-gray-400 uppercase tracking-wider border-b border-slate-200 dark:border-gray-800 text-[10px] font-semibold">
+                  <tr>
+                    <th className="py-3 px-4">Test Case Title</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Expected Result</th>
+                    <th className="py-3 px-4">Execution</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-gray-800/60 font-sans">
+                  {filteredCases.map((tc) => (
+                    <tr key={tc.id} className="hover:bg-slate-50/80 dark:hover:bg-gray-800/40 transition-colors">
+                      <td className="py-3 px-4 font-medium text-slate-900 dark:text-white cursor-pointer hover:text-indigo-400 max-w-xs truncate" onClick={() => setSelectedCaseId(tc.id)}>
                         {tc.title}
-                      </span>
-                      <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/20 font-mono">
-                        {tc.category}
-                      </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20 font-mono">
+                          {tc.category}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 dark:text-gray-400 max-w-sm truncate">
+                        {tc.expectedResult}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono ${
+                          tc.executionResult === "pass" 
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : tc.executionResult === "fail"
+                            ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                            : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                        }`}>
+                          {tc.executionResult || "untested"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={tc.status}
+                          onChange={(e) => handleStatusChange(tc.id, e.target.value as any)}
+                          className="bg-transparent border border-slate-200 dark:border-gray-800 text-[11px] rounded-lg px-2 py-1 text-slate-700 dark:text-gray-200 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="draft">Draft</option>
+                          <option value="reviewed">Reviewed</option>
+                          <option value="approved">Approved</option>
+                          <option value="done">Done</option>
+                        </select>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => handleDelete(tc.id)}
+                          className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
+                          title="Delete Case"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* Cards View */
+          <div className="space-y-3">
+            {filteredCases.map((tc) => {
+              return (
+                <div
+                  key={tc.id}
+                  className="bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-xl p-4 transition-all hover:border-slate-300 dark:hover:border-gray-700"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 cursor-pointer" onClick={() => setSelectedCaseId(tc.id)}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-xs text-slate-900 dark:text-white hover:text-indigo-300">
+                          {tc.title}
+                        </span>
+                        <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/20 font-mono">
+                          {tc.category}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-500 dark:text-gray-400 line-clamp-1">
+                        <strong className="text-slate-600 dark:text-gray-300">Expected:</strong> {tc.expectedResult}
+                      </p>
                     </div>
 
-                    <p className="text-xs text-slate-500 dark:text-gray-400 line-clamp-1">
-                      <strong className="text-slate-600 dark:text-gray-300">Expected:</strong> {tc.expectedResult}
-                    </p>
-                  </div>
+                    {/* Right Status Controls */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={tc.status}
+                        onChange={(e) => handleStatusChange(tc.id, e.target.value as "pending" | "in_progress" | "draft" | "reviewed" | "approved" | "done")}
+                        className={`text-[11px] font-semibold rounded-lg px-2.5 py-1 border focus:outline-none ${
+                          tc.status === "approved"
+                            ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/40"
+                            : tc.status === "done"
+                            ? "bg-green-950/60 text-green-300 border-green-500/40"
+                            : tc.status === "reviewed"
+                            ? "bg-cyan-950/60 text-cyan-300 border-cyan-500/40"
+                            : tc.status === "in_progress"
+                            ? "bg-blue-950/60 text-blue-300 border-blue-500/40"
+                            : tc.status === "pending"
+                            ? "bg-slate-800/60 text-slate-300 border-slate-500/40"
+                            : "bg-amber-950/60 text-amber-300 border-amber-500/40"
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="draft">Draft</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="approved">Approved</option>
+                        <option value="done">Done</option>
+                      </select>
 
-                  {/* Right Status Controls */}
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={tc.status}
-                      onChange={(e) => handleStatusChange(tc.id, e.target.value as "pending" | "in_progress" | "draft" | "reviewed" | "approved" | "done")}
-                      className={`text-[11px] font-semibold rounded-lg px-2.5 py-1 border focus:outline-none ${
-                        tc.status === "approved"
-                          ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/40"
-                          : tc.status === "done"
-                          ? "bg-green-950/60 text-green-300 border-green-500/40"
-                          : tc.status === "reviewed"
-                          ? "bg-cyan-950/60 text-cyan-300 border-cyan-500/40"
-                          : tc.status === "in_progress"
-                          ? "bg-blue-950/60 text-blue-300 border-blue-500/40"
-                          : tc.status === "pending"
-                          ? "bg-slate-800/60 text-slate-300 border-slate-500/40"
-                          : "bg-amber-950/60 text-amber-300 border-amber-500/40"
-                      }`}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="draft">Draft</option>
-                      <option value="reviewed">Reviewed</option>
-                      <option value="approved">Approved</option>
-                      <option value="done">Done</option>
-                    </select>
-
-                    <button
-                      onClick={() => handleDelete(tc.id)}
-                      className="p-1.5 rounded-lg text-slate-400 dark:text-gray-500 hover:text-red-400 hover:bg-slate-100 dark:bg-gray-800 transition-colors"
-                      title="Delete Test Case"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <button
+                        onClick={() => handleDelete(tc.id)}
+                        className="p-1.5 rounded-lg text-slate-400 dark:text-gray-500 hover:text-red-400 hover:bg-slate-100 dark:bg-gray-800 transition-colors"
+                        title="Delete Test Case"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
       )}

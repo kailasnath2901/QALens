@@ -1,4 +1,4 @@
-import { Project, TestCase, ChatMessage, Module, SubModule } from "@/types";
+import { Project, TestCase, ChatMessage, Module, SubModule, UserProfile, ProjectDoc } from "@/types";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -608,6 +608,124 @@ export async function deleteAllData(userId: string): Promise<{ deleted: { projec
     return { deleted: counts };
   } catch (error) {
     console.error("Error deleting all data:", error);
+    throw error;
+  }
+}
+
+const DOCS_COLLECTION = "project_docs";
+
+export async function getProjectDocs(projectId: string, moduleId?: string | null, subModuleId?: string | null): Promise<ProjectDoc[]> {
+  try {
+    const q = query(collection(db, DOCS_COLLECTION), where("projectId", "==", projectId));
+    const snapshot = await getDocs(q);
+    const docsList: ProjectDoc[] = [];
+    snapshot.forEach((snap) => {
+      const data = snap.data() as ProjectDoc;
+      if (subModuleId) {
+        if (data.subModuleId === subModuleId) docsList.push(data);
+      } else if (moduleId) {
+        if (data.moduleId === moduleId) docsList.push(data);
+      } else {
+        docsList.push(data);
+      }
+    });
+    return docsList.sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch (error) {
+    console.error("Error fetching project docs:", error);
+    return [];
+  }
+}
+
+export async function saveProjectDoc(docData: Omit<ProjectDoc, "id" | "createdAt" | "updatedAt">): Promise<ProjectDoc> {
+  const newId = `doc_${Date.now()}`;
+  const now = Date.now();
+  const newDoc: ProjectDoc = {
+    ...docData,
+    id: newId,
+    createdAt: now,
+    updatedAt: now
+  };
+  await setDoc(doc(db, DOCS_COLLECTION, newId), newDoc);
+  return newDoc;
+}
+
+export async function updateProjectDoc(docId: string, updates: Partial<Pick<ProjectDoc, "title" | "content">>): Promise<void> {
+  const docRef = doc(db, DOCS_COLLECTION, docId);
+  await updateDoc(docRef, {
+    ...updates,
+    updatedAt: Date.now()
+  });
+}
+
+export async function deleteProjectDoc(docId: string): Promise<void> {
+  await deleteDoc(doc(db, DOCS_COLLECTION, docId));
+}
+
+// ==========================================
+// ADMIN DASHBOARD FUNCTIONS
+// ==========================================
+const USERS_COLLECTION = "users";
+
+export async function getAllUsers(): Promise<UserProfile[]> {
+  try {
+    const snapshot = await getDocs(collection(db, USERS_COLLECTION));
+    const users: UserProfile[] = [];
+    snapshot.forEach((docSnap) => {
+      users.push(docSnap.data() as UserProfile);
+    });
+    return users.sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    console.error("Error fetching all users for admin:", error);
+    return [];
+  }
+}
+
+export async function updateUserStatus(
+  uid: string,
+  status: "pending" | "approved" | "rejected",
+  adminEmail: string
+): Promise<void> {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    await updateDoc(userRef, {
+      status,
+      approvedAt: status === "approved" ? Date.now() : null,
+      approvedBy: adminEmail
+    });
+  } catch (error) {
+    console.error("Error updating user status:", error);
+    throw error;
+  }
+}
+
+export async function updateUserFeatures(
+  uid: string,
+  features: Partial<UserProfile["features"]>
+): Promise<void> {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      const current = snap.data() as UserProfile;
+      await updateDoc(userRef, {
+        features: {
+          ...(current.features || { enableTony: true, enableGemini: true, enableGroq: true, maxProjects: 10 }),
+          ...features
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error updating user features:", error);
+    throw error;
+  }
+}
+
+export async function updateUserRole(uid: string, role: "admin" | "user"): Promise<void> {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    await updateDoc(userRef, { role });
+  } catch (error) {
+    console.error("Error updating user role:", error);
     throw error;
   }
 }
